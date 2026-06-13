@@ -36,7 +36,7 @@ import {
 import { CreateGameInputSchema } from "../core/WorkerSchemas";
 
 const PUBLIC_GAME_TYPES: PublicGameType[] = ["ffa", "team", "special"];
-const PUBLIC_LOBBY_START_DELAY_MS = 45_000;
+const PUBLIC_LOBBY_START_DELAY_MS = 10_000;
 const PRIVATE_LOBBY_DEFAULT_START_DELAY_SECONDS = 5;
 const TURN_INTERVAL_MS = 100;
 const LOBBY_BROADCAST_INTERVAL_MS = 1000;
