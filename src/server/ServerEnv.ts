@@ -111,6 +111,11 @@ export class ServerEnv {
     return 100;
   }
   static gameCreationRate(): number {
+    const raw = process.env.GAME_CREATION_RATE_MS;
+    if (raw) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
     return ServerEnv.gameEnv === GameEnv.Dev ? 5 * 1000 : 2 * 60 * 1000;
   }
   static workerIndex(gameID: GameID): number {

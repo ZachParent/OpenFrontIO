@@ -1,5 +1,6 @@
 import { GameMapType } from "./Game";
 import { GameMapLoader, MapData } from "./GameMapLoader";
+import { MapManifest } from "./TerrainMapLoader";
 
 export class FetchGameMapLoader implements GameMapLoader {
   private maps: Map<GameMapType, MapData>;
@@ -63,13 +64,13 @@ export class FetchGameMapLoader implements GameMapLoader {
     return new Uint8Array(data);
   }
 
-  private async loadJsonFromUrl(url: string) {
+  private async loadJsonFromUrl(url: string): Promise<MapManifest> {
     const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`Failed to load ${url}: ${response.statusText}`);
     }
 
-    return response.json();
+    return (await response.json()) as MapManifest;
   }
 }

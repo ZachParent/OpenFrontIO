@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
+  <title id="title">OpenFrontIO local tunnel architecture</title>
+  <desc id="desc">Diagram of browser clients, Cloudflare Tunnel, Docker, nginx, Node master and worker processes, and browser-side simulation workers.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .box { fill: #ffffff; stroke: #27364a; stroke-width: 2; rx: 10; }
+      .soft { fill: #edf4ff; stroke: #2f5f9f; }
+      .green { fill: #eef8f0; stroke: #2c7a43; }
+      .amber { fill: #fff7e6; stroke: #9a6500; }
+      .purple { fill: #f5f0ff; stroke: #6b46a3; }
+      .muted { fill: #f1f3f5; stroke: #576574; }
+      .title { font: 700 22px Arial, sans-serif; fill: #172033; }
+      .h { font: 700 16px Arial, sans-serif; fill: #172033; }
+      .t { font: 13px Arial, sans-serif; fill: #263244; }
+      .small { font: 12px Arial, sans-serif; fill: #4c5a6b; }
+      .arrow { stroke: #27364a; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke-dasharray: 7 6; }
+      .label { font: 12px Arial, sans-serif; fill: #27364a; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#27364a"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1180" height="760"/>
+  <text class="title" x="40" y="44">OpenFrontIO: local Docker plus Cloudflare Tunnel</text>
+  <text class="small" x="40" y="68">Key idea: the server coordinates turns; each browser runs the deterministic game simulation locally in a Web Worker.</text>
+
+  <rect class="soft" x="40" y="110" width="250" height="180" rx="12"/>
+  <text class="h" x="65" y="142">Players browsers</text>
+  <text class="t" x="65" y="170">Lit UI and menus</text>
+  <text class="t" x="65" y="194">WebGL renderer</text>
+  <text class="t" x="65" y="218">Core simulation Web Worker</text>
+  <text class="small" x="65" y="250">Sends intents, receives turns</text>
+
+  <rect class="purple" x="360" y="110" width="250" height="180" rx="12"/>
+  <text class="h" x="385" y="142">Cloudflare quick tunnel</text>
+  <text class="t" x="385" y="170">Public HTTPS and WSS URL</text>
+  <text class="t" x="385" y="194">Terminates edge connection</text>
+  <text class="t" x="385" y="218">Forwards to local machine</text>
+  <text class="small" x="385" y="250">trycloudflare.com URL</text>
+
+  <rect class="green" x="680" y="92" width="430" height="520" rx="14"/>
+  <text class="h" x="710" y="125">Docker container: openfrontio-local</text>
+  <text class="small" x="710" y="148">Host port 8788 maps to container port 80</text>
+
+  <rect class="box" x="720" y="180" width="350" height="95" rx="10"/>
+  <text class="h" x="745" y="212">nginx</text>
+  <text class="t" x="745" y="238">Listens on container :80</text>
+  <text class="t" x="745" y="260">Routes HTTP, assets, and WebSocket upgrades</text>
+
+  <rect class="box" x="720" y="315" width="350" height="105" rx="10"/>
+  <text class="h" x="745" y="347">Node master process</text>
+  <text class="t" x="745" y="373">Express app on :3000</text>
+  <text class="t" x="745" y="396">Serves app shell, static assets, health</text>
+
+  <rect class="box" x="720" y="465" width="155" height="95" rx="10"/>
+  <text class="h" x="745" y="497">Worker 0</text>
+  <text class="t" x="745" y="523">Express and ws</text>
+  <text class="small" x="745" y="545">:3001, /w0</text>
+
+  <rect class="box" x="915" y="465" width="155" height="95" rx="10"/>
+  <text class="h" x="940" y="497">Worker 1</text>
+  <text class="t" x="940" y="523">Express and ws</text>
+  <text class="small" x="940" y="545">:3002, /w1</text>
+
+  <rect class="amber" x="720" y="640" width="350" height="70" rx="10"/>
+  <text class="h" x="745" y="670">Closed-source API in production</text>
+  <text class="small" x="745" y="694">Auth, stats, cosmetics, monetization. Skipped/fail-open in this local dev tunnel.</text>
+
+  <path class="arrow" d="M 290 200 L 360 200"/>
+  <text class="label" x="305" y="188">HTTPS/WSS</text>
+  <path class="arrow" d="M 610 200 L 680 200"/>
+  <text class="label" x="622" y="188">localhost:8788</text>
+  <path class="arrow" d="M 895 275 L 895 315"/>
+  <text class="label" x="908" y="300">proxy</text>
+  <path class="arrow" d="M 825 420 L 800 465"/>
+  <path class="arrow" d="M 965 420 L 995 465"/>
+  <text class="label" x="870" y="452">cluster IPC</text>
+
+  <path class="arrow dash" d="M 245 230 C 390 365, 530 515, 720 515"/>
+  <text class="label" x="345" y="394">/w0 or /w1 game WebSocket</text>
+  <path class="arrow dash" d="M 245 178 C 400 300, 545 365, 720 365"/>
+  <text class="label" x="360" y="300">/ assets and app shell</text>
+
+  <rect class="muted" x="40" y="350" width="575" height="270" rx="12"/>
+  <text class="h" x="65" y="385">Turn flow</text>
+  <text class="t" x="65" y="418">1. Player action creates an intent in the browser.</text>
+  <text class="t" x="65" y="446">2. Browser sends intent to the assigned worker WebSocket.</text>
+  <text class="t" x="65" y="474">3. Server batches intents into a turn and relays it to clients.</text>
+  <text class="t" x="65" y="502">4. Each browser forwards the turn to its local core Web Worker.</text>
+  <text class="t" x="65" y="530">5. Core simulation executes deterministically and emits game updates.</text>
+  <text class="t" x="65" y="558">6. Client renderer applies updates and draws the map.</text>
+  <text class="small" x="65" y="590">That is why the server is coordination-heavy, not simulation-heavy.</text>
+</svg>

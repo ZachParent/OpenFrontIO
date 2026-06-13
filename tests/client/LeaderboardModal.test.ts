@@ -52,7 +52,9 @@ vi.mock("../../src/client/Api", () => {
       });
       if (!res.ok) {
         if (res.status === 400) {
-          const errorJson = await res.json().catch(() => null);
+          const errorJson = (await res.json().catch(() => null)) as {
+            message?: string;
+          } | null;
           if (errorJson?.message?.includes("Page must be between")) {
             return "reached_limit";
           }

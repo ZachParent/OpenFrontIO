@@ -1,8 +1,10 @@
 import { decodeJwt } from "jose";
+import { ClientEnv } from "src/client/ClientEnv";
 import { UserSettings } from "src/core/game/UserSettings";
 import { z } from "zod";
 import { TokenPayload, TokenPayloadSchema } from "../core/ApiSchemas";
 import { base64urlToUuid } from "../core/Base64";
+import { GameEnv } from "../core/configuration/Config";
 import { getApiBase, getAudience } from "./Api";
 import { generateCryptoRandomUUID } from "./Utils";
 
@@ -30,9 +32,8 @@ export async function tempTokenLogin(token: string): Promise<string | null> {
     console.error("Token login failed", response);
     return null;
   }
-  const json = await response.json();
-  const { email } = json;
-  return email;
+  const json = (await response.json()) as { email?: string };
+  return json.email ?? null;
 }
 
 export async function getAuthHeader(): Promise<string> {
@@ -77,6 +78,13 @@ export async function isLoggedIn(): Promise<boolean> {
 export async function userAuth(
   shouldRefresh: boolean = true,
 ): Promise<UserAuth> {
+  // Standalone/dev builds do not run the external auth API. The game server
+  // accepts the local persistent ID token path in dev mode, so avoid a bad
+  // pre-join refresh against api.<tunnel-host>.
+  if (ClientEnv.env() === GameEnv.Dev) {
+    return false;
+  }
+
   try {
     const jwt = __jwt;
     if (!jwt) {
@@ -165,7 +173,13 @@ async function doRefreshJwt(): Promise<void> {
       logOut();
       return;
     }
-    const json = await response.json();
+    const json = (await response.json()) as {
+      jwt?: string;
+      expiresIn?: number;
+    };
+    if (typeof json.jwt !== "string" || typeof json.expiresIn !== "number") {
+      throw new Error("Invalid refresh response");
+    }
     const { jwt, expiresIn } = json;
     __expiresAt = Date.now() + expiresIn * 1000;
     console.log("Refresh succeeded");

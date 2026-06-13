@@ -171,7 +171,7 @@ export class MatchmakingModal extends BaseModal {
       headers: { "Content-Type": "application/json" },
     });
 
-    const gameInfo = await response.json();
+    const gameInfo = (await response.json()) as { exists?: boolean };
 
     if (response.status !== 200) {
       console.error(`Error checking game ${this.gameID}: ${response.status}`);

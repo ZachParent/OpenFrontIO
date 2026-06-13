@@ -161,8 +161,8 @@ export async function createCheckoutSession(
       );
       return false;
     }
-    const json = await response.json();
-    return json.url;
+    const json = (await response.json()) as { url?: string };
+    return json.url ?? false;
   } catch (e) {
     console.error("createCheckoutSession: request failed", e);
     return false;
@@ -254,8 +254,8 @@ export async function openSubscriptionPortal(): Promise<string | false> {
       );
       return false;
     }
-    const json = await response.json();
-    return json.url;
+    const json = (await response.json()) as { url?: string };
+    return json.url ?? false;
   } catch (e) {
     console.error("openSubscriptionPortal: request failed", e);
     return false;
@@ -346,7 +346,7 @@ export async function fetchPlayerLeaderboard(
       return false;
     }
 
-    const json = await res.json();
+    const json = (await res.json()) as { message?: string };
     const parsed = RankedLeaderboardResponseSchema.safeParse(json);
     if (!parsed.success) {
       // Handle "Page must be between X and Y" error as end of list
