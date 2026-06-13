@@ -1081,6 +1081,8 @@
     "disabled_units": "Disabled Units",
     "enter_id": "Enter Lobby ID",
     "error": "An error occurred. Please try again or contact support.",
+    "expired_description": "This lobby or live game has expired or was cleaned up. Start or join a new game to keep playing.",
+    "expired_title": "Game no longer available",
     "game_length": "Game length",
     "host_cheats": "Host Cheats",
     "join_lobby": "Join Lobby",
