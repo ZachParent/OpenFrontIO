@@ -94,6 +94,38 @@ To run just the server with development settings:
 npm run start:server-dev
 ```
 
+### Cloudflare Workers (experimental)
+
+This fork includes an experimental Cloudflare Workers deployment path that serves the built client from Workers Static Assets and runs lobby/game coordination in Durable Objects.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/ZachParent/OpenFrontIO)
+
+Run locally with Wrangler:
+
+```bash
+npm run cf:dev
+```
+
+Deploy to your Cloudflare account:
+
+```bash
+npx wrangler login
+npm run cf:deploy
+```
+
+Deploy to a custom domain you own in Cloudflare:
+
+```bash
+npm run build-cloudflare
+npx wrangler deploy --domain your-subdomain.example.com
+```
+
+For public template use, avoid committing personal hostnames into `wrangler.toml`. If this is a private deployment rather than a reusable template, you can also configure a committed `[[routes]]` entry with `custom_domain = true`.
+
+For template-style deployments, Cloudflare reads `wrangler.toml` to provision the Worker assets binding and the `LobbyDurableObject` / `GameDurableObject` Durable Object classes. The `build` and `deploy` npm scripts are present so the Deploy to Cloudflare flow can prefill build and deploy commands.
+
+Cost note: inactive Durable Objects with no requests do not accrue duration charges. Hibernatable idle WebSockets can also avoid duration billing, but this implementation currently uses standard accepted WebSockets for active gameplay, so live games accrue Durable Object duration while connected clients and the turn loop are active. See Cloudflare Durable Objects pricing and WebSocket hibernation docs for details.
+
 ### Connecting to staging or production backends
 
 Sometimes it's useful to connect to production servers when replaying a game, testing user profiles, purchases, or login flow.

@@ -1,6 +1,7 @@
 "$schema" = "./node_modules/wrangler/config-schema.json"
 name = "openfrontio-cloudflare"
 main = "src/cloudflare/worker.ts"
+workers_dev = true
 compatibility_date = "2026-06-13"
 
 [assets]
