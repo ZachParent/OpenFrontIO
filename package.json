@@ -1,6 +1,7 @@
 {
   "name": "openfront-client",
   "scripts": {
+    "build": "npm run build-prod",
     "build-dev": "concurrently \"tsc --noEmit\" \"vite build --mode development\"",
     "build-prod": "concurrently --kill-others-on-fail \"tsc --noEmit\" \"vite build\"",
     "start:client": "vite",
@@ -25,6 +26,7 @@
     "gen-maps": "cd map-generator && go run . && npm run format",
     "inst": "npm ci --ignore-scripts",
     "build-cloudflare": "npm run build-prod",
+    "deploy": "wrangler deploy",
     "cf:dev": "npm run build-cloudflare && wrangler dev --port 8790",
     "cf:deploy": "npm run build-cloudflare && wrangler deploy"
   },
