@@ -200,7 +200,16 @@ export function joinLobby(
         });
     }
     if (message.type === "error") {
-      if (message.error === "full-lobby") {
+      if (message.error === "not_found") {
+        document.dispatchEvent(
+          new CustomEvent("leave-lobby", {
+            detail: { lobby: lobbyConfig.gameID, cause: "not-found" },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+        showExpiredGameModal(lobbyConfig.gameID, message.message);
+      } else if (message.error === "full-lobby") {
         document.dispatchEvent(
           new CustomEvent("leave-lobby", {
             detail: { lobby: lobbyConfig.gameID, cause: "full-lobby" },
@@ -1243,6 +1252,43 @@ export class ClientGameRunner {
       this.transport.reconnect();
     }
   }
+}
+
+function showExpiredGameModal(gameID: GameID, message?: string) {
+  if (document.querySelector("#error-modal")) {
+    return;
+  }
+
+  const startingModal = document.querySelector("game-starting-modal") as {
+    hide?: () => void;
+  } | null;
+  startingModal?.hide?.();
+
+  const modal = document.createElement("div");
+  modal.id = "error-modal";
+
+  const content = [
+    translateText("private_lobby.expired_title"),
+    "",
+    translateText("private_lobby.expired_description"),
+    "",
+    `Lobby ID: ${gameID}`,
+    message ? `Details: ${message}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const pre = document.createElement("pre");
+  pre.textContent = content;
+
+  const button = document.createElement("button");
+  button.textContent = translateText("common.close");
+  button.className = "copy-btn";
+  button.addEventListener("click", () => modal.remove());
+
+  modal.appendChild(pre);
+  modal.appendChild(button);
+  document.body.appendChild(modal);
 }
 
 function showErrorModal(
