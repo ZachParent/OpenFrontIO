@@ -58,12 +58,16 @@ export async function startWorker() {
   // Initialize lobby service (handles WebSocket upgrade routing)
   const lobbyService = new WorkerLobbyService(server, wss, gm, log);
 
-  setTimeout(
-    () => {
-      startMatchmakingPolling(gm);
-    },
-    1000 + Math.random() * 2000,
-  );
+  if (ServerEnv.env() === GameEnv.Dev) {
+    log.info("Skipping matchmaking polling in dev mode");
+  } else {
+    setTimeout(
+      () => {
+        startMatchmakingPolling(gm);
+      },
+      1000 + Math.random() * 2000,
+    );
+  }
 
   if (ServerEnv.otelEnabled()) {
     initWorkerMetrics(gm);
@@ -76,7 +80,11 @@ export async function startWorker() {
     ServerEnv.jwtIssuer() + "/reserved_clan_tags",
     log,
   );
-  privilegeRefresher.start();
+  if (ServerEnv.env() === GameEnv.Dev) {
+    log.info("Skipping privilege refresher in dev mode");
+  } else {
+    privilegeRefresher.start();
+  }
 
   // Middleware to handle /wX path prefix
   app.use((req, res, next) => {
@@ -592,7 +600,7 @@ async function startMatchmakingPolling(gm: GameManager) {
           return;
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as { assignment?: boolean };
         log.info(`Lobby poll successful:`, data);
 
         if (data.assignment) {

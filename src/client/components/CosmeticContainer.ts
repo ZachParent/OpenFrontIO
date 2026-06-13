@@ -419,7 +419,7 @@ export class CosmeticContainer extends LitElement {
       this._nameEl.textContent = this.name;
       // Always ensure it's the first child
       if (this.firstChild !== this._nameEl) {
-        this.prepend(this._nameEl);
+        this.insertBefore(this._nameEl, this.firstChild);
       }
     } else if (this._nameEl) {
       this._nameEl.remove();

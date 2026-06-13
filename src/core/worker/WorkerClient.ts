@@ -14,14 +14,18 @@ import { ClientID, GameStartInfo, Turn } from "../Schemas";
 import { generateID } from "../Util";
 import { WorkerMessage } from "./WorkerMessages";
 
-// Inlined as a same-origin Blob (Vite's `?worker&inline`), sidestepping the
-// cross-origin `new Worker(url)` restriction that would otherwise apply when
-// the worker bundle is served from the CDN. The dynamic import keeps the
-// ~700 KB base64 payload in its own chunk, fetched when a game starts,
-// instead of inside the main bundle.
+// CDN-backed builds still need an inline worker to avoid cross-origin worker
+// restrictions. The standalone Docker build serves assets same-origin, where a
+// URL-backed worker is more reliable on iOS WebKit behind a Cloudflare tunnel.
 async function createGameWorker(): Promise<Worker> {
+  if (getCdnBase()) {
+    const { default: GameWorker } =
+      await import("./Worker.worker.ts?worker&inline");
+    return new GameWorker();
+  }
+
   const { default: GameWorker } =
-    await import("./Worker.worker.ts?worker&inline");
+    await import("./Worker.worker.ts?worker");
   return new GameWorker();
 }
 
@@ -80,10 +84,45 @@ export class WorkerClient {
 
     return new Promise((resolve, reject) => {
       const messageId = generateID();
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+
+      const cleanup = () => {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+        worker.removeEventListener("error", onError);
+        worker.removeEventListener("messageerror", onMessageError);
+      };
+
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        this.messageHandlers.delete(messageId);
+        cleanup();
+        reject(error);
+      };
+
+      const onError = (event: ErrorEvent) => {
+        fail(
+          new Error(
+            `Game worker error: ${event.message || "unknown worker error"}`,
+          ),
+        );
+      };
+
+      const onMessageError = () => {
+        fail(new Error("Game worker failed to deserialize a message"));
+      };
+
+      worker.addEventListener("error", onError);
+      worker.addEventListener("messageerror", onMessageError);
 
       this.messageHandlers.set(messageId, (message) => {
         if (message.type === "initialized") {
+          settled = true;
           this.isInitialized = true;
+          cleanup();
           resolve();
         }
       });
@@ -96,12 +135,11 @@ export class WorkerClient {
         cdnBase: getCdnBase(),
       });
 
-      setTimeout(() => {
+      timeout = setTimeout(() => {
         if (!this.isInitialized) {
-          this.messageHandlers.delete(messageId);
-          reject(new Error("Worker initialization timeout"));
+          fail(new Error("Worker initialization timeout"));
         }
-      }, 60000);
+      }, 15000);
     });
   }
 

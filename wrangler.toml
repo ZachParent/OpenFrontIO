@@ -1,0 +1,31 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "openfrontio-cloudflare"
+main = "src/cloudflare/worker.ts"
+compatibility_date = "2026-06-13"
+
+[assets]
+directory = "./static"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+html_handling = "none"
+run_worker_first = true
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "LobbyDurableObject"
+
+[[durable_objects.bindings]]
+name = "GAME"
+class_name = "GameDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LobbyDurableObject", "GameDurableObject"]
+
+[vars]
+OPENFRONT_GAME_ENV = "dev"
+OPENFRONT_NUM_WORKERS = "1"
+OPENFRONT_TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+OPENFRONT_JWT_AUDIENCE = "localhost"
+OPENFRONT_INSTANCE_ID = "CLOUDFLARE_DEV"
+OPENFRONT_GIT_COMMIT = "DEV"

@@ -28,6 +28,7 @@ import "./FlagInput";
 import { FlagInput } from "./FlagInput";
 import "./FlagInputModal";
 import { FlagInputModal } from "./FlagInputModal";
+import { preloadGameplayHudAssets } from "./GameHudAssets";
 import { GameInfoModal } from "./GameInfoModal";
 import "./GameModeSelector";
 import { GameModeSelector } from "./GameModeSelector";
@@ -486,9 +487,8 @@ class Client {
 
     const onUserMe = async (userMeResponse: UserMeResponse | false) => {
       updateAccountNavButton(userMeResponse);
-      const isAdFree =
-        userMeResponse !== false && userMeResponse.player?.adfree === true;
-      window.adsEnabled = !isAdFree && !crazyGamesSDK.isOnCrazyGames();
+      // This local standalone tunnel build is intentionally ad-free.
+      window.adsEnabled = false;
       document.dispatchEvent(
         new CustomEvent("userMeResponse", {
           detail: userMeResponse,
@@ -1076,6 +1076,7 @@ const bootstrap = () => {
   // Prevent Safari's page-level pinch-zoom, which ignores `user-scalable=no`
   // on iOS and can softlock the HUD. See issue #2330.
   installSafariPinchZoomBlocker();
+  preloadGameplayHudAssets();
 
   initLayout();
   new Client().initialize();

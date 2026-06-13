@@ -990,7 +990,7 @@ export class JoinLobbyModal extends BaseModal {
       return "error";
     }
 
-    const archiveData = await archiveResponse.json();
+    const archiveData = (await archiveResponse.json()) as { details?: unknown };
     const parsed = GameRecordSchema.safeParse(archiveData);
     if (!parsed.success) {
       return "version_mismatch";
