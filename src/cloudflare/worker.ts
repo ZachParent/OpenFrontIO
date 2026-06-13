@@ -42,6 +42,7 @@ const TURN_INTERVAL_MS = 100;
 const LOBBY_BROADCAST_INTERVAL_MS = 1000;
 const PRESTART_TO_START_DELAY_MS = 2000;
 const MAX_GAME_DURATION_MS = 3 * 60 * 60 * 1000;
+const EMPTY_GAME_IDLE_TIMEOUT_MS = 60_000;
 
 interface Env {
   ASSETS: Fetcher;
@@ -92,6 +93,10 @@ interface StoredClient {
 interface ConnectedClient extends StoredClient {
   ws: WebSocket;
   lastPing: number;
+}
+
+interface SocketAttachment {
+  clientID?: ClientID;
 }
 
 function jsonResponse(data: unknown, init?: ResponseInit): Response {
@@ -400,7 +405,10 @@ export class LobbyDurableObject {
   constructor(
     private readonly state: DurableObjectState,
     private readonly env: Env,
-  ) {}
+  ) {
+    this.lobbySockets = new Set(this.state.getWebSockets());
+    if (this.lobbySockets.size > 0) this.startBroadcasting();
+  }
 
   async fetch(request: Request): Promise<Response> {
     if (!isWebSocketRequest(request)) {
@@ -412,22 +420,28 @@ export class LobbyDurableObject {
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
-    server.accept();
+    this.state.acceptWebSocket(server);
     this.lobbySockets.add(server);
-
-    server.addEventListener("close", () => {
-      this.lobbySockets.delete(server);
-      this.stopBroadcastingIfIdle();
-    });
-    server.addEventListener("error", () => {
-      this.lobbySockets.delete(server);
-      this.stopBroadcastingIfIdle();
-    });
 
     await this.sendFull(server);
     this.startBroadcasting();
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  webSocketClose(
+    ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean,
+  ): void {
+    this.lobbySockets.delete(ws);
+    this.stopBroadcastingIfIdle();
+  }
+
+  webSocketError(ws: WebSocket, _error: unknown): void {
+    this.lobbySockets.delete(ws);
+    this.stopBroadcastingIfIdle();
   }
 
   private startBroadcasting(): void {
@@ -573,11 +587,11 @@ export class GameDurableObject {
   private game: StoredGameState | null = null;
   private activeClients = new Map<ClientID, ConnectedClient>();
   private socketToClientID = new Map<WebSocket, ClientID>();
-  private pendingSockets = new Set<WebSocket>();
   private intents: StampedIntent[] = [];
   private turnTimer: ReturnType<typeof setTimeout> | null = null;
   private startTimer: ReturnType<typeof setTimeout> | null = null;
   private lobbyInfoTimer: ReturnType<typeof setTimeout> | null = null;
+  private emptySince: number | null = null;
 
   constructor(
     private readonly state: DurableObjectState,
@@ -586,7 +600,14 @@ export class GameDurableObject {
     this.state.blockConcurrencyWhile(async () => {
       this.game =
         (await this.state.storage.get<StoredGameState>("game")) ?? null;
+      this.rehydrateWebSockets();
       this.scheduleStartIfNeeded();
+      if (this.game?.hasStarted && this.activeClients.size > 0) {
+        this.startTurnLoop();
+      }
+      if (this.game && !this.game.hasStarted && this.activeClients.size > 0) {
+        this.scheduleLobbyInfoBroadcast();
+      }
     });
   }
 
@@ -708,18 +729,51 @@ export class GameDurableObject {
   private acceptGameSocket(): Response {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
-    server.accept();
-    this.pendingSockets.add(server);
-
-    server.addEventListener("message", (event: MessageEvent) => {
-      this.handleSocketMessage(server, event.data).catch((error: unknown) => {
-        this.sendError(server, "server-error", String(error));
-      });
-    });
-    server.addEventListener("close", () => this.disconnectSocket(server));
-    server.addEventListener("error", () => this.disconnectSocket(server));
+    this.state.acceptWebSocket(server);
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(
+    ws: WebSocket,
+    data: string | ArrayBuffer,
+  ): Promise<void> {
+    try {
+      await this.handleSocketMessage(ws, data);
+    } catch (error: unknown) {
+      this.sendError(ws, "server-error", String(error));
+    }
+  }
+
+  webSocketClose(
+    ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean,
+  ): void {
+    this.disconnectSocket(ws);
+  }
+
+  webSocketError(ws: WebSocket, _error: unknown): void {
+    this.disconnectSocket(ws);
+  }
+
+  private socketAttachment(ws: WebSocket): SocketAttachment | null {
+    const attachment = ws.deserializeAttachment();
+    if (attachment && typeof attachment === "object") {
+      return attachment as SocketAttachment;
+    }
+    return null;
+  }
+
+  private rehydrateWebSockets(): void {
+    if (!this.game) return;
+    for (const ws of this.state.getWebSockets()) {
+      const clientID = this.socketAttachment(ws)?.clientID;
+      if (clientID && this.game.allClients[clientID]) {
+        this.attachSocketToClient(ws, clientID);
+      }
+    }
   }
 
   private async handleSocketMessage(
@@ -887,10 +941,9 @@ export class GameDurableObject {
         // Ignore stale socket close failures.
       }
       this.socketToClientID.delete(previous.ws);
-      this.pendingSockets.delete(previous.ws);
     }
 
-    this.pendingSockets.delete(ws);
+    ws.serializeAttachment({ clientID } satisfies SocketAttachment);
     this.socketToClientID.set(ws, clientID);
     this.activeClients.set(clientID, {
       ...stored,
@@ -900,7 +953,6 @@ export class GameDurableObject {
   }
 
   private disconnectSocket(ws: WebSocket): void {
-    this.pendingSockets.delete(ws);
     const clientID = this.socketToClientID.get(ws);
     if (!clientID) return;
     this.socketToClientID.delete(ws);
@@ -1043,6 +1095,16 @@ export class GameDurableObject {
         this.game.hasEnded = true;
         await this.persistGame();
         return;
+      }
+      if (this.activeClients.size === 0) {
+        this.emptySince ??= Date.now();
+        if (Date.now() - this.emptySince >= EMPTY_GAME_IDLE_TIMEOUT_MS) {
+          this.game.hasEnded = true;
+          await this.persistGame();
+          return;
+        }
+      } else {
+        this.emptySince = null;
       }
       await this.endTurn();
       this.startTurnLoop();
